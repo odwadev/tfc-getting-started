@@ -1,41 +1,30 @@
-# Copyright (c) HashiCorp, Inc.
-# SPDX-License-Identifier: MPL-2.0
-
-# The following configuration uses a provider which provisions [fake] resources
-# to a fictitious cloud vendor called "Fake Web Services". Configuration for
-# the fakewebservices provider can be found in provider.tf.
-#
-# After running the setup script (./scripts/setup.sh), feel free to change these
-# resources and 'terraform apply' as much as you'd like! These resources are
-# purely for demonstration and created in Terraform Cloud, scoped to your TFC
-# user account.
-#
-# To review the provider and documentation for the available resources and
-# schemas, see: https://registry.terraform.io/providers/hashicorp/fakewebservices
-#
-# If you're looking for the configuration for the remote backend, you can find that
-# in backend.tf.
-
-
-resource "fakewebservices_vpc" "primary_vpc" {
-  name       = "Primary VPC"
-  cidr_block = "0.0.0.0/1"
+provider "aws" {
+  region = var.aws_region
 }
 
-resource "fakewebservices_server" "servers" {
-  count = 2
+# Define VPC
+resource "aws_vpc" "primary_vpc" {
+  cidr_block           = "10.0.0.0/16"
+  enable_dns_support   = true
+  enable_dns_hostnames = true
 
-  name = "Server ${count.index + 1}"
-  type = "t2.micro"
-  vpc  = fakewebservices_vpc.primary_vpc.name
+  tags = {
+    Name = "Primary VPC"
+  }
 }
 
-resource "fakewebservices_load_balancer" "primary_lb" {
-  name    = "Primary Load Balancer"
-  servers = fakewebservices_server.servers[*].name
+# Define Subnets within the VPC
+resource "aws_subnet" "primary_subnet" {
+  count                   = 2
+  vpc_id                  = aws_vpc.primary_vpc.id
+  cidr_block              = "10.0.${count.index}.0/24"
+  availability_zone       = element(data.aws_availability_zones.available.names, count.index)
+  map_public_ip_on_launch = true
+
+  tags = {
+    Name = "Primary Subnet ${count.index + 1}"
+  }
 }
 
-resource "fakewebservices_database" "prod_db" {
-  name = "Production DB 1"
-  size = 256
-}
+# Data source for availability zones
+data "aws_availability_zones" "available" {}
